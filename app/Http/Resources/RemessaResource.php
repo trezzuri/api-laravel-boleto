@@ -8,8 +8,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class RemessaResource extends JsonResource
 {
     /**
-     * Transform the resource into an array.
-     *
+     * Transforma objeto em array
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array

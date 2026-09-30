@@ -6,7 +6,6 @@ use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use \Eduardokum\LaravelBoleto\Util;
 use \Eduardokum\LaravelBoleto\Pessoa;
 use \Eduardokum\LaravelBoleto\Boleto\Render\Pdf;
@@ -16,41 +15,52 @@ class Boleto extends Model
 {
     use HasFactory;
 
-    // definir a conexão com mongodb
+    // Define a conexão com mongodb
     protected  $connection = 'mongodb';
 
-    // equivale ao $table do MySQL
+    // Equivale ao $table do MySQL
     protected  $collection = 'boletos';
 
-    // define campos 
+    // Define campos 
     protected  $fillable = ['banco', 'dados'];
 
-    /**
-     * Override do método save para gerar o boleto
-     *
-     * @param  array  $options
-     * @return bool
-     */
+    // Salva o arquivo 
     public function save(array $options = [])
     {
-
-        // cria o pdf do boleto
-        $pdf = new Pdf();
-        $pdf->addBoleto($this->boleto);
-        $pdf->hideInstrucoes();
-        $arquivo = uniqid($this->banco) . '.pdf';
-        Storage::put($arquivo, $pdf->gerarBoleto($pdf::OUTPUT_STRING));
-
-        // armazena os dados para retorno na api
-        $this->linha_digitavel = $this->boleto->getLinhaDigitavel();
-        $this->codigo_barras = $this->boleto->getCodigoBarras();
-        $this->numero = $this->boleto->getNumero();
-        $this->numero_documento = $this->boleto->getNumeroDocumento();
-        $this->nosso_numero = $this->boleto->getNossoNumero();
-        $this->nosso_numero_boleto = $this->boleto->getNossoNumeroBoleto();
-        $this->pdf = $arquivo;
-
         return parent::save($options);
+    }
+
+    /** 
+     * Gera os dados derivados do boleto e o arquivo PDF 
+     * Este método deve ser chamado explicitamente antes do save
+     * @return void 
+     */ 
+    public function gerar(): void 
+    { 
+        // Obtém o objeto do boleto 
+        $boleto = $this->boleto; 
+        
+        // Armazena os dados calculados pelo LaravelBoleto
+        $this->linha_digitavel = $boleto->getLinhaDigitavel(); 
+        $this->codigo_barras = $boleto->getCodigoBarras(); 
+        $this->numero = $boleto->getNumero(); 
+        $this->numero_documento = $boleto->getNumeroDocumento(); 
+        $this->nosso_numero = $boleto->getNossoNumero(); 
+        $this->nosso_numero_boleto = $boleto->getNossoNumeroBoleto(); 
+
+        // Cria o PDF do boleto 
+        $pdf = new Pdf(); 
+        $pdf->addBoleto($boleto); 
+        $pdf->hideInstrucoes(); 
+
+        // Define o nome do arquivo 
+        $arquivo = $this->banco . '/' . uniqid('', true) . '.pdf'; 
+
+        // Armazena o PDF 
+        Storage::put($arquivo, $pdf->gerarBoleto($pdf::OUTPUT_STRING)); 
+
+        // Armazena o caminho do PDF no boleto 
+        $this->pdf = $arquivo; 
     }
 
     /**
@@ -61,22 +71,25 @@ class Boleto extends Model
         return Attribute::make(
             get: function (mixed $value, array $attributes) {
 
-                // obtém a classe do boleto a ser gerado
+                // Obtém a classe do boleto a ser gerado
                 $classe = '\\Eduardokum\\LaravelBoleto\\Boleto\\' . Util::getBancoClass($attributes['banco']);
 
-                // remove do array de dados os campos vazios para evitar mensagens de erro desnecessárias
-                $dados = array_filter($attributes['dados'], fn ($item) => !empty($item));
+                // Remove do array de dados os campos vazios para evitar mensagens de erro desnecessárias
+                // empty também pode ser 0 ou '0'; por isso verifique somente null e ''
+                $dados = array_filter($attributes['dados'], fn ($item) => $item !== null && $item !== '');
 
-                // prepara os dados no formato esperado pela classe 
+                // Prepara os dados no formato esperado pela classe 
                 $dados['beneficiario'] = new Pessoa($dados['beneficiario']);
                 $dados['pagador'] = new Pessoa($dados['pagador']);
                 $dados['dataVencimento'] = new Carbon($dados['dataVencimento']);
 
-                // obtém a url com o logo, senão usa o logo do banco
-                $dados['logo'] = $dados['logo'] ?? realpath(base_path() . 
-                    '/vendor/eduardokum/laravel-boleto/logos/' . $attributes['banco'] . '.png');
+                // Obtém a url com o logo, senão usa o logo do banco. Se não existir não atribui o campo
+                $logo = base_path('vendor/eduardokum/laravel-boleto/logos/' .$attributes['banco'] . '.png');
+                if (!isset($dados['logo']) && file_exists($logo)) {
+                    $dados['logo'] = realpath($logo);
+                }
 
-                // quebra os textos longos, se necessário
+                // Quebra os textos longos, se necessário
                 if (isset($dados['descricaoDemonstrativo']))
                     $dados['descricaoDemonstrativo'] = is_array($dados['descricaoDemonstrativo']) ? 
                         $dados['descricaoDemonstrativo'] :
@@ -86,7 +99,7 @@ class Boleto extends Model
                         $dados['instrucoes'] :
                         $this->texto_em_array($dados['instrucoes']);
 
-                // retorna o objeto boleto
+                // Retorna o objeto boleto
                 return new $classe($dados);                
             },
         );
@@ -94,7 +107,6 @@ class Boleto extends Model
 
     /**
      * Transforma um texto em um array de textos limitados a $max_char caracteres.
-     *
      * @return array<string, mixed>
      */
     private function texto_em_array(string $texto, int $max_char = 60): array

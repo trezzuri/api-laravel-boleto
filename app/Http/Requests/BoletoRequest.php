@@ -11,17 +11,14 @@ use \Eduardokum\LaravelBoleto\Util;
 
 class BoletoRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
+    // Verifica permissão para request
     public function authorize(): bool
     {
         return true;
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
+     * Verifica regras para a request
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
@@ -49,53 +46,87 @@ class BoletoRequest extends FormRequest
             "dados.pagador.uf" => "required|string",
             "dados.pagador.cidade" => "required|string",
             "dados.pagador.documento" => "required|string",
+            "dados.convenio" => "required_if:banco,001|string",
+			"dados.variacaoCarteira" => "required_if:banco,001|string",
+			"dados.codigoCliente" => "nullable|string",
+			"dados.operacao" => "nullable|string",
+			"dados.posto" => "nullable|string",
+			"dados.modalidadeCarteira" => "nullable|string",
+			"dados.range" => "nullable|string",
+			"dados.byte" => "nullable|string",
         ];
     }
 
-    /**
-     * Valida dados 
-     */
+    // Valida dados 
     public function after(): array
     {
         return [
             function (Validator $validator) {  
 
-                // somente realiza as validações seguintes se passou nas rules
+                // Somente realiza as validações seguintes se passou nas rules
                 if ($validator->errors()->isNotEmpty()) 
                     return;
 
-                // verifica se o banco está implementado
+                // Verifica se o banco está implementado
                 $banco = $this->input('banco');
-                $classe = Util::getBancoClass($banco);
+                try {
+                    Util::getBancoClass($banco);
+                } catch (\Throwable $e) {
+                    $validator->errors()->add(
+                        'banco',
+                        'Banco não implementado.'
+                    );
+                    return;
+                }
 
-                // valida se o beneficiario pode ser convertido em objeto Pessoa
+                // Valida se o beneficiario pode ser convertido em objeto Pessoa
                 $beneficiario = $this->input('dados')['beneficiario'];
-                $pessoa = new Pessoa($beneficiario);
+                try {
+                    new Pessoa($beneficiario);
+                } catch (\Throwable $e) {
+                    $validator->errors()->add(
+                        'dados.beneficiario',
+                        'Dados do beneficiário inválidos.'
+                    );
+                    return;
+                }
 
-                // valida se o pagador pode ser convertido em objeto Pessoa
+                // Valida se o pagador pode ser convertido em objeto Pessoa
                 $pagador = $this->input('dados')['pagador'];
-                $pessoa = new Pessoa($pagador);
+                try {
+                    new Pessoa($pagador);
+                } catch (\Throwable $e) {
+                    $validator->errors()->add(
+                        'dados.pagador',
+                        'Dados do pagador inválidos.'
+                    );
+                    return;
+                }
                     
-                // valida o documento do beneficiario
+                // Valida o documento do beneficiario
                 $doc1 = new ValidaCPFCNPJ($beneficiario['documento']);
-                if ( ! $doc1->valida() ) 
+                if (!$doc1->valida()) {
                     $validator->errors()->add(
                         'dados.beneficiario.documento',
                         'Documento do beneficiário (CPF ou CNPJ) inválido'
                     );
+                    return;
+                }
                     
-                // valida o documento do pagador
+                // Valida o documento do pagador
                 $doc2 = new ValidaCPFCNPJ($pagador['documento']);
-                if ( ! $doc2->valida() ) 
+                if (!$doc2->valida()) {
                     $validator->errors()->add(
                         'dados.pagador.documento',
                         'Documento do pagador (CPF ou CNPJ) inválido'
                     );
+                    return;
+                }
             }
         ];
     }
 
-    // retorna json com erros
+    // Retorna json com erros
     public function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(response()->json([

@@ -14,52 +14,51 @@ class Remessa extends Model
 {
     use HasFactory;
 
-    // definir a conexão com mongodb
+    // Define a conexão com mongodb
     protected  $connection = 'mongodb';
 
-    // equivale ao $table do MySQL
+    // Equivale ao $table do MySQL
     protected  $collection = 'remessa';
 
-    // define campos 
+    // Define campos 
     protected  $fillable = ['banco', 'boletos', 'dados', 'layout'];
 
-    /**
-     * Override do método save para gerar o cnab
-     *
-     * @param  array  $options
-     * @return bool
-     */
+    // Salva o arquivo 
     public function save(array $options = [])
     {
-
-        // obtém o código do banco
-        $banco = $this->banco;
-
-        // obtém o layout de Remessa
-        $layout = $this->layout ?? '400';
-
-        // remove do array de dados os campos vazios para evitar mensagens de erro desnecessárias
-        $dados = array_filter($this->dados, fn ($item) => !empty($item));
-
-        // prepara os dados no formato esperado pela classe 
-        $dados['beneficiario'] = new Pessoa($dados['beneficiario']);
-
-        // Cria o objeto Remessa
-        $classe = '\\Eduardokum\\LaravelBoleto\\Cnab\\Remessa\\Cnab' . $layout . '\\' . Util::getBancoClass($banco);
-        $obj_cnab = new $classe($dados);
-
-        // adiciona o boleto para geração do Remessa
-        foreach ($this->boletos as $id) {
-            $boleto = Boleto::findOrFail($id);
-            $obj_cnab->addBoleto($boleto->boleto);
-        }
-
-        // gera o arquivo de remessa 
-        $arquivo = uniqid($banco) . '.rem';
-        Storage::put($arquivo, $obj_cnab->gerar());
-        $this->arquivo = $arquivo;
-
         return parent::save($options);
     }
 
+    /** 
+     * Gera o arquivo CNAB de remessa.
+     * Este método deve ser chamado explicitamente antes do save 
+     * @return void 
+     */ 
+    public function gerar(): void { 
+        // Obtém o código do banco 
+        $banco = $this->banco; 
+        // Define o layout padrão 
+        $layout = $this->layout ?? '400';
+
+        // Remove somente valores null e string vazia, dessa forma, valores 0 e "0" continuam sendo preservados
+        $dados = array_filter($this->dados, fn ($item) => $item !== null && $item !== ''); 
+        // Converte o beneficiário para Pessoa 
+        $dados['beneficiario'] = new Pessoa( $dados['beneficiario'] ); 
+        // Obtém a classe da remessa 
+        $classe = '\\Eduardokum\\LaravelBoleto\\Cnab\\Remessa\\Cnab' . $layout . '\\' . Util::getBancoClass($banco); 
+    
+        // Cria o objeto CNAB 
+        $obj_cnab = new $classe($dados); 
+        // Adiciona os boletos 
+        foreach ($this->boletos as $id) { 
+            $boleto = Boleto::findOrFail($id); 
+            $obj_cnab->addBoleto( $boleto->boleto ); 
+        } 
+        // Gera o arquivo de remessa 
+        $arquivo = $banco . '/' . uniqid('', true) . '.rem'; 
+        Storage::put($arquivo, $obj_cnab->gerar()); 
+        
+        // Armazena o caminho do arquivo no model 
+        $this->arquivo = $arquivo; 
+    }
 }

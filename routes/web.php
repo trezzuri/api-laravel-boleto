@@ -23,4 +23,4 @@ Route::get('/file/{file}', function ($file) {
     } else {
         abort(400, 'File ' . $file . ' not found');
     }
-});
+})->where('file', '.*');

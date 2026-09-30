@@ -209,6 +209,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/Erro400"
 
+# API RETORNO
+  /api/retorno:
+    post:
+      operationId: retorno-post
+      summary: POST /api/retorno
+      description: Recebe e processa um arquivo CNAB de retorno. O banco e o layout (CNAB240 ou CNAB400) são identificados automaticamente pelo conteúdo do arquivo.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/RetornoRequest"
+      responses:
+        "201":
+          description: Retorno processado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Retorno200"
+        "422":
+          description: Arquivo inválido ou incompatível
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Erro400"
+
 # FILE
   /file/{filename}:
     get:
@@ -637,6 +663,16 @@ components:
           description: Dados da remessa
           $ref: "#/components/schemas/RemessaDados"
 
+    RetornoRequest:
+      description: Arquivo CNAB de retorno a ser processado. O banco e o layout são identificados automaticamente a partir do conteúdo do arquivo.
+      type: object
+      required:
+        - arquivo
+      properties:
+        arquivo:
+          type: string
+          format: binary
+          description: Arquivo CNAB de retorno enviado pelo usuário
 
 # RESPONSES
 
@@ -759,8 +795,73 @@ components:
           description: Dados da remessa gerada
           items:
             $ref: "#/components/schemas/RemessaResponseData"
-
-
+    
+    RetornoResponseData:
+      description: Dados processados do arquivo de retorno
+      type: object
+      properties:
+        id:
+          type: string
+          example: "656dc2aae8862d4fe00604f2"
+        custom_id_retorno:
+          type: string
+          example: "001656dc2aa4a75c_64f123abc_retorno"
+        arquivo:
+          type: object
+          properties:
+            nome:
+              type: string
+              example: "001656dc2aa4a75c.ret"
+            path:
+              type: string
+              example: "retornos/001656dc2aa4a75c.ret"
+            mime:
+              type: string
+              example: "application/octet-stream"
+            tamanho:
+              type: integer
+              example: 12480
+        banco:
+          type: string
+          example: "001"
+        codigo_banco:
+          type: string
+          example: "001"
+        nome_banco:
+          type: string
+          nullable: true
+          example: "BANCO DO BRASIL"
+        layout:
+          type: string
+          enum:
+            - "240"
+            - "400"
+          example: "400"
+        tipo_cnab:
+          type: integer
+          example: 400
+        status:
+          type: string
+          example: "Processado"
+        mensagem:
+          type: string
+          nullable: true
+        dados:
+          type: object
+          description: Dados estruturados extraídos pelo parser CNAB
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+  
+    Retorno200:
+      description: Retorno processado com sucesso
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/RetornoResponseData"
 
 externalDocs:
   description: Para maiores informações, consulte o projeto no Github
