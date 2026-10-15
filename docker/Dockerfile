@@ -1,4 +1,4 @@
-FROM php:8.1-fpm-alpine3.18
+FROM php:8.3-fpm-alpine
 
 WORKDIR /var/www/html
 
@@ -15,10 +15,9 @@ RUN apk add --no-cache \
   icu-dev \
   git \
   supervisor \
-  nginx \ 
+  nginx \
   curl-dev \
-  openssl-dev \
-  php81-pecl-mongodb
+  openssl-dev
 
 # Copy nginx config file
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
@@ -34,9 +33,9 @@ COPY docker/mongodb.ini /usr/local/etc/php/conf.d/mongodb.ini
 
 # Install and configure extensions
 RUN docker-php-ext-configure intl && \
-    docker-php-ext-install zip sodium intl && \
-    docker-php-ext-enable zip sodium && \
-    pecl install mongodb && \
+    docker-php-ext-install zip intl && \
+    pecl install mongodb-1.21.9 && \
+    docker-php-ext-enable mongodb && \
     pecl config-set php_ini /usr/local/etc/php/php.ini
 
 # Install composer
@@ -58,7 +57,12 @@ COPY --chown=app:app ./.env.example /var/www/html/.env
 USER app
 
 # Install composer packages and generate app key
-RUN composer install --optimize-autoloader --no-interaction
+RUN composer install \
+    --optimize-autoloader \
+    --no-interaction \
+    --no-progress \
+    --prefer-dist \
+    && composer clear-cache
 RUN php artisan key:generate
 
 # Change current user back to root

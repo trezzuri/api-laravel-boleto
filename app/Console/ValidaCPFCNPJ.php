@@ -166,7 +166,9 @@ class ValidaCPFCNPJ
 		// Verifica se o CNPJ gerado é idêntico ao enviado
 		if ( $cnpj === $cnpj_original ) {
 			return true;
-		}
+		} else {
+            return false;
+        }
 	}
 
 	/**

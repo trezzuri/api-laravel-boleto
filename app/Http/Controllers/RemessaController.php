@@ -9,47 +9,68 @@ use Illuminate\Http\Request;
 
 class RemessaController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    // Lista de Remessas
     public function index()
     {
-        $remessa = Remessa::paginate(500);
-        return RemessaResource::collection($remessa);
+        try {
+            $remessas = Remessa::paginate(500);
+            return RemessaResource::collection($remessas);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['message' => 'Falha ao listar arquivos de Remessa'], 400);
+        }
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    // Armazenamento de Remessas
     public function store(RemessaRequest $request)
     {
-        // cria o model remessa
-        $remessa = Remessa::create($request->all());
-        return new RemessaResource($remessa);
+        try {
+            // Cria o model com os dados validados 
+            $remessa = new Remessa(); 
+            $remessa->fill($request->validated()); 
+            // Gera o arquivo CNAB 
+            $remessa->gerar(); 
+            // Salva a Remessa no MongoDB 
+            $remessa->save(); 
+            
+            return new RemessaResource($remessa);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['message' => 'Falha ao enviar arquivo de Remessa.'], 400);
+        }
     }
 
-    /**
-     * Display the specified resource.
-     */
+    // Display de Remessas
     public function show(Remessa $remessa)
     {
-        return new RemessaResource($remessa);
+        try {
+            return new RemessaResource($remessa);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['message' => 'Falha ao mostrar arquivo de Remessa.'], 400);
+        }
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
+    // Update de Remessas
     public function update(RemessaRequest $request, Remessa $remessa)
     {
-        $remessa->update($request->all());
-        return new RemessaResource($remessa);
+        try {
+            $remessa->update($request->validated());
+            return new RemessaResource($remessa);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['message' => 'Falha ao atualizar arquivo de Remessa.'], 400);
+        }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
+    // Exclusão de Remessas
     public function destroy(Remessa $remessa)
     {
-        return Remessa::destroy($remessa->_id);
+        try {
+            return Remessa::destroy($remessa->_id);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json(['message' => 'Falha ao excluir arquivo de Remessa.'], 400);
+        }
     }
 }
