@@ -47,7 +47,7 @@ class BoletoRequest extends FormRequest
             "dados.pagador.cidade" => "required|string",
             "dados.pagador.documento" => "required|string",
             "dados.convenio" => "required_if:banco,001|string",
-			"dados.variacaoCarteira" => "required_if:banco,001|string",
+			"dados.variacaoCarteira" => "required_if:banco,001|nullable|string",
 			"dados.codigoCliente" => "nullable|string",
 			"dados.operacao" => "nullable|string",
 			"dados.posto" => "nullable|string",
